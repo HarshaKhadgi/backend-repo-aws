@@ -26,7 +26,7 @@ spec:
             - name: "PORT"
               value: "5000"
             - name: "MONGO_URL"
-              value: "mongodb+srv://harsharitik:harsha123@cluster0.edwly.mongodb.net/learnMongo?retryWrites=true&w=majority&appName=Cluster0"
+              value: "mongodb+srv://harsha:Harsha8080@cluster0.za0sveq.mongodb.net/learnMongo?retryWrites=true&w=majority&appName=Cluster0"
             - name: "JWT_SECRET_KEY"
               value: "cdsfifnbedfiubeduifgbndeoignsdoingviodbngibgioes!@#$%^&Ytvftgvghv"
             - name: "RAZORPAY_KEY_ID"
