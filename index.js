@@ -46,9 +46,9 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.use("/registerUser", registerUserRoute);
-app.use("/ecommerceProduct", ecommerceProductRoute);
-app.use("/order", orderRoute);
+app.use("/api/registerUser", registerUserRoute);
+app.use("/api/ecommerceProduct", ecommerceProductRoute);
+app.use("/api/order", orderRoute);
 
 app.listen(port, () => {
   console.log(`Listning on port ${port}`);
