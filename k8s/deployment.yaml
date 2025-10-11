@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: mern-backend
-          image: 17harsha08/mern-backend
+          image: 17harsha08/mern-backend:a958f05b83bc815d3dc27866e3aa55708a698c78
           imagePullPolicy: Always
           ports:
             - containerPort: 80
