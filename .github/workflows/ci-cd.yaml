@@ -3,90 +3,104 @@ name: CI-CD to EKS
 on:
   push:
     branches:
-      - master # change if you use another branch
+    - master # change if you use another branch
+
+permissions:
+  contents: write # ✅ allow pushing commits
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
+    # wfeses
     steps:
-      # -------------------------
-      # Checkout latest code
-      # -------------------------
-      - name: Checkout code
-        uses: actions/checkout@v4
+    # -------------------------
+    # Checkout latest code
+    # -------------------------
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-      # -------------------------
-      # Configure AWS credentials
-      # -------------------------
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+    # -------------------------
+    # Configure AWS credentials
+    # -------------------------
+    # - name: Configure AWS credentials
+    #   uses: aws-actions/configure-aws-credentials@v4
+    #   with:
+    #     aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+    #     aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+    #     aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Install kubectl
-        run: |
-          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-          sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+    # - name: Install kubectl
+    #   run: |
+    #     curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+    #     sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 
-      - name: Set up eksctl
-        run: |
-          curl --silent --location "https://github.com/eksctl-io/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
-          sudo mv /tmp/eksctl /usr/local/bin
+    # - name: Set up eksctl
+    #   run: |
+    #     curl --silent --location "https://github.com/eksctl-io/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
+    #     sudo mv /tmp/eksctl /usr/local/bin
 
-      # - name: Set up Helm
-      #   uses: azure/setup-helm@v4
-      #   with:
-      #     version: v3.16.2
+    # - name: Set up Helm
+    #   uses: azure/setup-helm@v4
+    #   with:
+    #     version: v3.16.2
 
-      # -------------------------
-      # Authenticate with EKS
-      # -------------------------
-      - name: Update kubeconfig
-        run: |
-          aws eks update-kubeconfig --region ${{ secrets.AWS_REGION }} --name ${{ secrets.AWS_EKS_CLUSTER_NAME }}
+    # -------------------------
+    # Authenticate with EKS
+    # -------------------------
+    # - name: Update kubeconfig
+    #   run: |
+    #     aws eks update-kubeconfig --region ${{ secrets.AWS_REGION }} --name ${{ secrets.AWS_EKS_CLUSTER_NAME }}
 
-      # -------------------------
-      # Login to DockerHub
-      # -------------------------
-      - name: Login to DockerHub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+    # -------------------------
+    # Login to DockerHub
+    # -------------------------
+    - name: Login to DockerHub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # -------------------------
-      # Login to Amazon ECR
-      # -------------------------
-      # - name: Login to Amazon ECR
-      #   id: login-ecr
-      #   uses: aws-actions/amazon-ecr-login@v2
+    # -------------------------
+    # Login to Amazon ECR
+    # -------------------------
+    # - name: Login to Amazon ECR
+    #   id: login-ecr
+    #   uses: aws-actions/amazon-ecr-login@v2
 
-      # -------------------------
-      # Build and Push Docker image
-      # -------------------------
+    # -------------------------
+    # Build and Push Docker image
+    # -------------------------
 
-      - name: Build & Push Docker image
-        run: |
-          IMAGE_NAME=${{ secrets.DOCKERHUB_USERNAME }}/${{ secrets.DOCKER_IMAGE_NAME }} # if you use DockerHub
+    - name: Build & Push Docker image
+      run: |
+        IMAGE_NAME=${{ secrets.DOCKERHUB_USERNAME }}/${{ secrets.DOCKER_IMAGE_NAME }} # if you use DockerHub
 
-          # IMAGE_NAME=${{secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-west-2.amazonaws.com/mern-frontend # change it to your ECR repository
+        # IMAGE_NAME=${{secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-west-2.amazonaws.com/mern-frontend # change it to your ECR repository
 
-          IMAGE_TAG=${{ github.sha }}
+        IMAGE_TAG=${{ github.sha }}
 
-          docker build -t $IMAGE_NAME:$IMAGE_TAG .
-          docker push $IMAGE_NAME:$IMAGE_TAG
-          echo "IMAGE_NAME=$IMAGE_NAME" >> $GITHUB_ENV
-          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
+        docker build -t $IMAGE_NAME:$IMAGE_TAG .
+        docker push $IMAGE_NAME:$IMAGE_TAG
+        echo "IMAGE_NAME=$IMAGE_NAME" >> $GITHUB_ENV
+        echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
 
-      # -------------------------
-      # Deploy to EKS
-      # -------------------------
-      - name: Deploy to EKS
-        run: |
-          kubectl apply -f k8s/deployment.yaml
-          kubectl apply -f k8s/service.yaml
-          kubectl set image deployment/${{ secrets.DEPLOYMENT_NAME }} ${{ secrets.DOCKER_IMAGE_NAME }}=${IMAGE_NAME}:${IMAGE_TAG} -n ${{ secrets.NAMESPACE_NAME }}
-          kubectl rollout status deployment/${{ secrets.DEPLOYMENT_NAME }} -n ${{ secrets.NAMESPACE_NAME }}
+    - name: Update deployment image tag
+      run: |
+        sed -i "s|\(image:\s*\).*|\1${IMAGE_NAME}:${IMAGE_TAG}|" k8s/deployment.yaml
+
+    - name: Commit and Push changes
+      run: |
+        git config user.name "github-actions"
+        git config user.email "actions@github.com"
+        git add k8s/deployment.yaml
+        git commit -m "update image tag to ${IMAGE_TAG}"
+        git push 
+    # -------------------------
+    # Deploy to EKS
+    # -------------------------
+    # - name: Deploy to EKS
+    #   run: |
+    #     kubectl apply -f k8s/deployment.yaml
+    #     kubectl apply -f k8s/service.yaml
+    #     kubectl set image deployment/${{ secrets.DEPLOYMENT_NAME }} ${{ secrets.DOCKER_IMAGE_NAME }}=${IMAGE_NAME}:${IMAGE_TAG} -n ${{ secrets.NAMESPACE_NAME }}
+    #     kubectl rollout status deployment/${{ secrets.DEPLOYMENT_NAME }} -n ${{ secrets.NAMESPACE_NAME }}
